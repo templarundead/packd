@@ -8,100 +8,109 @@
 	<title>packd</title>
 
 	<style>
-		body {
-			font-family: arial;
-			text-align: center;
-			line-height: 1.5;
-		}
+@keyframes pulse {
+	0% {
+		opacity: .5
+	}
 
-		main {
-			min-height: calc(100vh - 10em);
-			padding: 4em 1em;
-			box-sizing: border-box;
-		}
+	to {
+		opacity: 1
+	}
+}
 
-		h1 {
-			font-size: 20vw;
-			text-transform: uppercase;
-			text-shadow: 2px 2px white, -2px -2px white, -2px 2px white, 2px -2px white;
-			margin: 0 0 1em 0;
-		}
+body {
+	font-family: arial;
+	text-align: center;
+	line-height: 1.5;
+	background-color: #222
+}
 
-		h1:first-letter {
-			border: 0.1em solid black;
-			padding: 0em 0.15em;
-			margin-right: -0.3em;
-		}
+main {
+	min-height: calc(100vh - 10em);
+	padding: 4em 1em;
+	box-sizing: border-box
+}
 
-		input, button {
-			font-family: inherit;
-			font-size: 5vw;
-			border: 1px solid black;
-			outline: none;
-			padding: 0.2em;
-			background-color: white;
-			text-align: center;
-		}
+h1 {
+	font-size: 15vw;
+	text-transform: uppercase;
+	color: #444;
+	text-shadow: 1px 1px gray,-1px -1px gray,-1px 1px gray,1px -1px gray;
+	margin: 0 0 1em
+}
 
-		button {
-			padding: 0.2em 1em;
-		}
+h1:first-letter {
+	border: .1px solid #000;
+	padding: 0 .15em;
+	margin-right: -.3em
+}
 
-		button span {
-			font-size: 0.8em;
-		}
+button,input {
+	font-family: inherit;
+	font-size: 5vw;
+	outline: 0;
+	border: 0;
+	padding: .2em;
+	background-color: #333;
+	text-align: center;
+	border-radius: 0;
+	color: gray;
+	-webkit-appearance: none;
+	-webkit-tap-highlight-color: transparent
+}
 
-		footer {
-			color: #999;
-			padding: 0 1em;
-		}
+button {
+	padding: .2em 1em
+}
 
-		a {
-			color: #999;
-		}
+button span {
+	font-size: .8em
+}
 
-		.loading {
-			display: block;
-			margin: 1em auto 0 auto;
-			max-width: 20em;
-			font-style: 1em;
-			opacity: 0;
-			transition: opacity 0.2s;
-			transition-delay: 0.4s;
-		}
+footer {
+	padding: 0 1em
+}
 
-		.loading.active {
-			opacity: 0.5;
-			animation-name: pulse;
-			animation-duration: 1s;
-			animation-delay: 0.8s;
-			animation-direction: alternate;
-			animation-iteration-count: infinite;
-		}
+a,footer {
+	color: #999
+}
 
-		@media (min-width: 480px) {
-			h1 {
-				font-size: 7.2em;
-			}
+.loading {
+	display: block;
+	margin: 1em auto 0;
+	max-width: 20em;
+	font-style: 1em;
+	opacity: 0;
+	transition: opacity .2s;
+	transition-delay: .4s
+}
 
-			input, button {
-				font-family: inherit;
-				font-size: 2em;
-			}
-		}
+.loading.active {
+	opacity: .5;
+	animation-name: pulse;
+	animation-duration: 1s;
+	animation-delay: .4s;
+	animation-direction: alternate;
+	animation-iteration-count: infinite
+}
 
-		@keyframes pulse {
-			from { opacity: 0.5 }
-			to { opacity: 1 }
-		}
-	</style>
+@media (min-width:480px) {
+	h1 {
+		font-size: 7.2em
+	}
+
+	button,input {
+		font-family: inherit;
+		font-size: 2em
+	}
+}	</style>
 </head>
 <body>
 	<main>
 		<h1>packd</h1>
 		<form>
-			<input value='left-pad' spellcheck='false'>
-			<button><span>↵</span></button>
+			<input value='left-pad' spellcheck='false' onclick='this.setSelectionRange(0, 99999)'>
+			<button>Go</button>
 		</form>
 
 		<span class='loading'>
@@ -116,15 +125,7 @@
 	</footer>
 
 	<script>
-		document.querySelector( 'form' ).addEventListener( 'submit', event => {
-			event.preventDefault();
-
-			document.querySelector( '.loading' ).classList.add( 'active' );
-
-			const input = document.querySelector( 'input' );
-			window.history.pushState( {}, '', `/${input.value}` );
-			window.location.href = `/${input.value}`;
-		});
+		document.querySelector("form").addEventListener("submit",e=>{e.preventDefault(),document.querySelector(".loading").classList.add("active");e=document.querySelector("input");window.history.pushState({},"","/"+e.value),window.location.href="/"+e.value});
 	</script>
 </body>
 </html>
