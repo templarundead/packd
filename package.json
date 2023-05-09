@@ -32,7 +32,7 @@
     "lru-cache": "^5.1.1",
     "minilog": "^3.1.0",
     "npm": "^9.0.0",
-    "pretty-bytes": "^5.1.0",
+    "pretty-bytes": "^6.0.0",
     "request": "^2.81.0",
     "request-promise": "^4.2.1",
     "rollup": "^1.1.0",
