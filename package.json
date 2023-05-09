@@ -46,7 +46,7 @@
     "terser": "^3.14.1"
   },
   "devDependencies": {
-    "eslint": "^5.12.0"
+    "eslint": "^8.0.0"
   },
   "now": {
     "alias": "packd",
