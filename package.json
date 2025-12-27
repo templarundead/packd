@@ -3,7 +3,7 @@
   "version": "2.8.0",
   "description": "Simple alternative to browserify-cdn",
   "scripts": {
-    "start": "node server",
+    "start": "bun server/index.js",
     "deploy": "now && now alias",
     "test": "node test/test.js",
     "postpublish": "npm run deploy"
