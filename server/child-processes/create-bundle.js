@@ -1,251 +1,136 @@
-const fs = require('fs');
-const path = require('path');
-const sander = require('sander');
-const child_process = require('child_process');
-const tar = require('tar');
-const request = require('request');
-const browserify = require('browserify');
+// server/child-processes/create-bundle.js
+const { parentPort } = require('worker_threads');
 const rollup = require('rollup');
-const resolve = require('@rollup/plugin-node-resolve');
-const Terser = require('terser');
-const isModule = require('is-module');
-const makeLegalIdentifier = require('../utils/makeLegalIdentifier');
+const browserify = require('browserify');
+const sander = require('sander');
+const { minify } = require('uglify-js');
+const path = require('path');
+const os = require('os');
+const fs = require('fs');
+const { promisify } = require('util');
+const exec = promisify(require('child_process').exec);
 
-const { npmInstallEnvVars, root, tmpdir } = require('../../config.js');
+const tmpDir = path.join(os.tmpdir(), 'packd');
 
-process.on('message', message => {
+// Создаем временную директорию, если её нет
+try {
+	if (!fs.existsSync(tmpDir)) {
+		fs.mkdirSync(tmpDir, { recursive: true });
+	}
+} catch (err) {
+	console.error('Failed to create temp directory:', err);
+}
+
+process.on('message', async (message) => {
 	if (message.type === 'start') {
-		createBundle(message.params);
+		const { hash, pkg, version, deep, query } = message.params;
+		
+		try {
+			console.log(`[${pkg.name}] Starting bundle creation`);
+			
+			// Создаем временную директорию для этого пакета
+			const packageDir = path.join(tmpDir, hash);
+			if (!fs.existsSync(packageDir)) {
+				fs.mkdirSync(packageDir, { recursive: true });
+			}
+			
+			// Устанавливаем пакет
+			console.log(`[${pkg.name}] Installing ${pkg.name}@${version}`);
+			try {
+				await exec(`npm install --prefix ${packageDir} --no-package-lock --silent ${pkg.name}@${version}`);
+			} catch (installErr) {
+				console.error(`[${pkg.name}] Installation failed:`, installErr.message);
+				throw new Error(`Failed to install package: ${installErr.message}`);
+			}
+			
+			// Определяем точку входа
+			const packageJsonPath = path.join(packageDir, 'node_modules', pkg.name, 'package.json');
+			if (!fs.existsSync(packageJsonPath)) {
+				throw new Error(`Package.json not found for ${pkg.name}`);
+			}
+			
+			const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+			const entryPoint = packageJson.module || packageJson.main || 'index.js';
+			const entryPath = path.join(packageDir, 'node_modules', pkg.name, entryPoint);
+			
+			if (!fs.existsSync(entryPath)) {
+				throw new Error(`Entry point not found: ${entryPoint}`);
+			}
+			
+			let code;
+			
+			// Выбираем стратегию сборки
+			if (query.format === 'esm' && packageJson.module) {
+				// Rollup для ESM
+				console.log(`[${pkg.name}] Using Rollup for ESM bundle`);
+				const bundle = await rollup.rollup({
+					input: entryPath,
+					external: []
+				});
+				
+				const result = await bundle.generate({
+					format: 'esm',
+					name: query.name || pkg.name.replace(/[^a-zA-Z0-9_]/g, '_')
+				});
+				
+				code = result.output[0].code;
+			} else {
+				// Browserify для UMD
+				console.log(`[${pkg.name}] Using Browserify for UMD bundle`);
+				const b = browserify(entryPath, {
+					standalone: query.name || pkg.name.replace(/[^a-zA-Z0-9_]/g, '_'),
+					basedir: path.join(packageDir, 'node_modules', pkg.name)
+				});
+				
+				code = await new Promise((resolve, reject) => {
+					b.bundle((err, buf) => {
+						if (err) reject(err);
+						else resolve(buf.toString());
+					});
+				});
+			}
+			
+			// Минифицируем, если не esm и не запрошено иначе
+			if (query.format !== 'esm' && !query.nominify) {
+				console.log(`[${pkg.name}] Minifying bundle`);
+				try {
+					const minified = minify(code);
+					if (minified.error) {
+						console.warn(`[${pkg.name}] Minification warning:`, minified.error);
+					} else {
+						code = minified.code;
+					}
+				} catch (minErr) {
+					console.warn(`[${pkg.name}] Minification failed, using unminified:`, minErr.message);
+				}
+			}
+			
+			if (!code || code.trim() === '') {
+				throw new Error('Generated code is empty');
+			}
+			
+			console.log(`[${pkg.name}] Bundle created successfully, size: ${code.length} bytes`);
+			
+			// Отправляем результат обратно
+			process.send({ type: 'result', code });
+			
+			// Очищаем временную директорию
+			try {
+				await exec(`rm -rf ${packageDir}`);
+			} catch (cleanErr) {
+				console.warn(`Failed to clean up ${packageDir}:`, cleanErr.message);
+			}
+			
+		} catch (err) {
+			console.error(`[${pkg.name}] Bundle creation error:`, err.message, err.stack);
+			process.send({
+				type: 'error',
+				message: err.message,
+				stack: err.stack
+			});
+		}
 	}
 });
 
+// Сообщаем, что процесс готов
 process.send('ready');
-
-async function createBundle({ hash, pkg, version, deep, query }) {
-	const dir = `${tmpdir}/${hash}`;
-	const cwd = `${dir}/package`;
-
-	try {
-		await sander.mkdir(dir);
-		await fetchAndExtract(pkg, version, dir);
-		await sanitizePkg(cwd);
-		await installDependencies(cwd);
-
-		const code = await bundle(cwd, deep, query);
-
-		info(`[${pkg.name}] minifying`);
-
-		const result = Terser.minify(code);
-
-		if (result.error) {
-			info(`[${pkg.name}] minification failed: ${result.error.message}`);
-		}
-
-		process.send({
-			type: 'result',
-			code: result.error ? code : result.code
-		});
-	} catch (err) {
-		process.send({
-			type: 'error',
-			message: err.message,
-			stack: err.stack
-		});
-	}
-
-	sander.rimraf(dir);
-}
-
-function fetchAndExtract(pkg, version, dir) {
-	const tarUrl = pkg.versions[version].dist.tarball;
-
-	info(`[${pkg.name}] fetching ${tarUrl}`);
-
-	return new Promise((fulfil, reject) => {
-		let timedout = false;
-
-		const timeout = setTimeout(() => {
-			reject(new Error('Request timed out'));
-			timedout = true;
-		}, 10000);
-
-		const input = request(tarUrl);
-
-		// don't like going via the filesystem, but piping into targz
-		// was failing for some weird reason
-		const intermediate = sander.createWriteStream(`${dir}/package.tgz`);
-
-		input.pipe(intermediate);
-
-		intermediate.on('close', () => {
-			clearTimeout(timeout);
-
-			if (!timedout) {
-				info(`[${pkg.name}] extracting to ${dir}/package`);
-
-				tar
-					.x({
-						file: `${dir}/package.tgz`,
-						cwd: dir
-					})
-					.then(fulfil, reject);
-			}
-		});
-	});
-}
-
-function sanitizePkg(cwd) {
-	const pkg = require(`${cwd}/package.json`);
-	pkg.scripts = {};
-	return sander.writeFile(
-		`${cwd}/package.json`,
-		JSON.stringify(pkg, null, '  ')
-	);
-}
-
-function installDependencies(cwd) {
-	const pkg = require(`${cwd}/package.json`);
-
-	const envVariables = npmInstallEnvVars.join(' ');
-	const installCommand = `${envVariables} ${root}/node_modules/.bin/npm install --production`;
-
-	info(`[${pkg.name}] running ${installCommand}`);
-
-	return exec(installCommand, cwd, pkg).then(() => {
-		if (!pkg.peerDependencies) return;
-
-		return Object.keys(pkg.peerDependencies).reduce((promise, name) => {
-			return promise.then(() => {
-				info(`[${pkg.name}] installing peer dependency ${name}`);
-				const version = pkg.peerDependencies[name];
-				return exec(
-					`${root}/node_modules/.bin/npm install "${name}@${version}"`,
-					cwd,
-					pkg
-				);
-			});
-		}, Promise.resolve());
-	});
-}
-
-function bundle(cwd, deep, query) {
-	const pkg = require(`${cwd}/package.json`);
-	const moduleName = query.name || makeLegalIdentifier(pkg.name);
-	const format = query.format || 'umd';
-
-	const entryName = pkg.module || pkg['jsnext:main'] || pkg.main;
-	if (!entryName) {
-		throw new Error("package has no entry file; please specify a `module` key in your `package.json`.");
-	}
-
-	const entry = deep
-		? path.resolve(cwd, deep)
-		: findEntry(
-			path.resolve(cwd, entryName)
-		  );
-
-	const code = sander.readFileSync(entry, { encoding: 'utf-8' });
-
-	if (isModule(code)) {
-		info(`[${pkg.name}] ES2015 module found, using Rollup`);
-		return bundleWithRollup(cwd, pkg, entry, moduleName, format);
-	} else {
-		info(`[${pkg.name}] No ES2015 module found, using Browserify`);
-		return bundleWithBrowserify(pkg, entry, moduleName, format);
-	}
-}
-
-function findEntry(file) {
-	try {
-		const stats = sander.statSync(file);
-		if (stats.isDirectory()) return `${file}/index.js`;
-		return file;
-	} catch (err) {
-		return `${file}.js`;
-	}
-}
-
-async function bundleWithRollup(cwd, pkg, moduleEntry, name, format) {
-	const bundle = await rollup.rollup({
-		input: path.resolve(cwd, moduleEntry),
-		plugins: [
-			resolve({ module: true, jsnext: true, main: false, modulesOnly: true })
-		]
-	});
-
-	const result = await bundle.generate({
-		format,
-		name
-	});
-
-	if (result.output.length > 1) {
-		info(`[${pkg.name}] generated multiple chunks, trying Browserify instead`);
-		return bundleWithBrowserify(pkg, moduleEntry, name, format);
-	}
-
-	if (result.output[0].imports.length > 0) {
-		info(
-			`[${pkg.name}] non-ES2015 dependencies found, handing off to Browserify`
-		);
-
-		const intermediate = `${cwd}/__intermediate.js`;
-		const { code } = await bundle.generate({
-			format: 'cjs'
-		});
-
-		fs.writeFileSync(intermediate, code);
-		return bundleWithBrowserify(pkg, intermediate, name, format);
-	}
-
-	info(`[${pkg.name}] bundled using Rollup`);
-
-	return result.output[0].code;
-}
-
-function bundleWithBrowserify(pkg, main, moduleName, format) {
-	if (format === 'esm') {
-		throw new Error(`Failed to generate ES module`);
-	}
-
-	const b = browserify(main, {
-		standalone: moduleName
-	});
-
-	return new Promise((fulfil, reject) => {
-		b.bundle((err, buf) => {
-			if (err) {
-				reject(err);
-			} else {
-				info(`[${pkg.name}] bundled using Browserify`);
-				fulfil('' + buf);
-			}
-		});
-	});
-}
-
-function exec(cmd, cwd, pkg) {
-	return new Promise((fulfil, reject) => {
-		child_process.exec(cmd, { cwd }, (err, stdout, stderr) => {
-			if (err) {
-				return reject(err);
-			}
-
-			stdout.split('\n').forEach(line => {
-				info(`[${pkg.name}] ${line}`);
-			});
-
-			stderr.split('\n').forEach(line => {
-				info(`[${pkg.name}] ${line}`);
-			});
-
-			fulfil();
-		});
-	});
-}
-
-function info(message) {
-	process.send({
-		type: 'info',
-		message
-	});
-}
