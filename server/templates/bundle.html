@@ -182,10 +182,8 @@
 		<div class="info">
 			<div>
 				<span class="package-name">__PACKAGE_NAME__</span>
-<span class="package-size">
-    <span id="original-size">__ORIGINAL_SIZE__</span>
-    (<span id="gzipped-size">__GZIPPED_SIZE__</span> gzipped)
-</span>
+				<span class="package-size">
+					<span id="original-size">__ORIGINAL_SIZE__</span> (<span id="gzipped-size">__GZIPPED_SIZE__</span> gzipped) </span>
 			</div>
 			<div class="buttons">
 				<button class="copy-btn" id="copy-btn">Copy to Clipboard</button>
@@ -209,44 +207,8 @@
 		document.body.appendChild(notification);
 		setTimeout(function() { notification.remove(); }, 2000);
 	}
-
-	function copyToClipboard() {
-		// Способ 1: Modern Clipboard API
-		if (navigator.clipboard && window.isSecureContext) {
-			navigator.clipboard.writeText(bundleContent).then(function() {
-				showNotification('Bundle copied to clipboard!', false);
-			}).catch(function() {
-				fallbackCopy(bundleContent);
-			});
-		} else {
-			fallbackCopy(bundleContent);
-		}
-	}
-
-	function fallbackCopy(text) {
-		// Способ 2: Создаем временное текстовое поле
-		const textarea = document.createElement('textarea');
-		textarea.value = text;
-		textarea.style.position = 'fixed';
-		textarea.style.top = '-9999px';
-		textarea.style.left = '-9999px';
-		document.body.appendChild(textarea);
-		textarea.select();
-		textarea.setSelectionRange(0, text.length);
-		try {
-			const success = document.execCommand('copy');
-			if (success) {
-				showNotification('✓ Bundle copied to clipboard!', false);
-			} else {
-				showNotification('Failed to copy. Please select and copy manually.', true);
-			}
-		} catch (err) {
-			showNotification('Failed to copy. Please select and copy manually.', true);
-		}
-		document.body.removeChild(textarea);
-	}
 	document.getElementById('copy-btn').addEventListener('click', function() {
-		copyToClipboard(bundleContent);
+		navigator.clipboard.writeText(bundleContent).then(() => showNotification('Bundle copied to clipboard!', false)).catch(() => showNotification('Failed to copy. Please select and copy manually.', true));
 	});
 	document.getElementById('download-btn').addEventListener('click', function() {
 		const blob = new Blob([bundleContent], { type: 'application/javascript' });
