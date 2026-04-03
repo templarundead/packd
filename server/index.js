@@ -4,6 +4,7 @@ const express = require('express');
 const compression = require('compression');
 const prettyBytes = require('pretty-bytes');
 const favicon = require('serve-favicon');
+const https = require('https');
 const pkgInfo = require('../package.json');
 const padRight = require('./utils/padRight.js');
 const servePackage = require('./serve-package.js');
@@ -137,8 +138,24 @@ app.get('/', (req, res) => {
 
 app.use(servePackage);
 
-app.listen(port, () => {
-	logger.log(`started at ${new Date().toUTCString()}`);
-	console.log('listening on localhost:' + port);
-	if (process.send) process.send('start');
-});
+// Запуск HTTPS сервера (перенесено в конец)
+if (fs.existsSync('privkey.pem') && fs.existsSync('fullchain.pem')) {
+	const options = {
+		key: fs.readFileSync('privkey.pem'),
+		cert: fs.readFileSync('fullchain.pem')
+	};
+	
+	https.createServer(options, app).listen(port, () => {
+		logger.log(`started at ${new Date().toUTCString()}`);
+		console.log('listening on https://localhost:' + port);
+		if (process.send) process.send('start');
+	});
+} else {
+	// Fallback на HTTP если сертификаты не найдены
+	console.log('SSL certificates not found, using HTTP');
+	app.listen(port, () => {
+		logger.log(`started at ${new Date().toUTCString()}`);
+		console.log('listening on http://localhost:' + port);
+		if (process.send) process.send('start');
+	});
+}
