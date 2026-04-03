@@ -1,118 +1,121 @@
 <!doctype html>
 <html>
+
 <head>
 	<meta charset='utf-8'>
 	<meta name="apple-mobile-web-app-title" content="packd">
 	<meta name="apple-mobile-web-app-capable" content="yes">
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 	<meta name='viewport' content='initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui'>
-	<link rel="apple-touch-icon-precomposed" sizes="192x192" href="icon.png?ver=1.2">
-	<link rel='apple-touch-startup-image' href='startup.png?ver=1.2'>
 	<title>packd</title>
-
 	<style>
-@keyframes pulse {
-	0% {
-		opacity: .5
+	@keyframes pulse {
+		0% {
+			opacity: .5
+		}
+
+		to {
+			opacity: 1
+		}
 	}
 
-	to {
-		opacity: 1
+	body {
+		font-family: arial;
+		text-align: center;
+		line-height: 1.5;
+		background-color: #222
 	}
-}
 
-body {
-	font-family: arial;
-	text-align: center;
-	line-height: 1.5;
-	background-color: #222
-}
+	input::selection {
+		background-color: #80808057;
+	}
 
-input::selection {
-	background-color: #80808057;
-}
+	main {
+		min-height: calc(100vh - 10em);
+		padding: 4em 1em;
+		box-sizing: border-box
+	}
 
-main {
-	min-height: calc(100vh - 10em);
-	padding: 4em 1em;
-	box-sizing: border-box
-}
-
-h1 {
-	font-size: 15vw;
-	text-transform: uppercase;
-	color: #444;
-	text-shadow: 1px 1px gray,-1px -1px gray,-1px 1px gray,1px -1px gray;
-	margin: 0 0 1em
-}
-
-h1:first-letter {
-	border: .1px solid #444;
-	padding: 0 .15em;
-	margin-right: -.3em
-}
-
-button,input {
-	font-family: inherit;
-	font-size: 5vw;
-	outline: 0;
-	border: 0;
-	padding: .2em;
-	background-color: #333;
-	text-align: center;
-	border-radius: 0;
-	color: gray;
-	caret-color: gray;
-	-webkit-appearance: none;
-	-webkit-tap-highlight-color: transparent
-}
-
-button {
-	padding: .2em 1em
-}
-
-button span {
-	font-size: .8em
-}
-
-footer {
-	padding: 0 1em
-}
-
-a,footer {
-	color: #999
-}
-
-.loading {
-	display: block;
-	margin: 1em auto 0;
-	max-width: 20em;
-	font-style: 1em;
-	opacity: 0;
-	transition: opacity .2s;
-	transition-delay: .4s
-}
-
-.loading.active {
-	opacity: .5;
-	animation-name: pulse;
-	animation-duration: 1s;
-	animation-delay: .4s;
-	animation-direction: alternate;
-	animation-iteration-count: infinite
-}
-
-@media (min-width:480px) {
 	h1 {
-		font-size: 7.2em
+		font-size: 15vw;
+		text-transform: uppercase;
+		color: #444;
+		text-shadow: 1px 1px gray, -1px -1px gray, -1px 1px gray, 1px -1px gray;
+		margin: 0 0 1em
 	}
 
-	button,input {
-		font-family: inherit;
-		font-size: 2em
+	h1:first-letter {
+		border: .1px solid #444;
+		padding: 0 .15em;
+		margin-right: -.3em
 	}
-}	</style>
+
+	button,
+	input {
+		font-family: inherit;
+		font-size: 5vw;
+		outline: 0;
+		border: 0;
+		padding: .2em;
+		background-color: #333;
+		text-align: center;
+		border-radius: 0;
+		color: gray;
+		caret-color: gray;
+		-webkit-appearance: none;
+		-webkit-tap-highlight-color: transparent
+	}
+
+	button {
+		padding: .2em 1em
+	}
+
+	button span {
+		font-size: .8em
+	}
+
+	footer {
+		padding: 0 1em
+	}
+
+	a,
+	footer {
+		color: #999
+	}
+
+	.loading {
+		display: block;
+		margin: 1em auto 0;
+		max-width: 20em;
+		font-style: 1em;
+		opacity: 0;
+		transition: opacity .2s;
+		transition-delay: .4s
+	}
+
+	.loading.active {
+		opacity: .5;
+		animation-name: pulse;
+		animation-duration: 1s;
+		animation-delay: .4s;
+		animation-direction: alternate;
+		animation-iteration-count: infinite
+	}
+
+	@media (min-width:480px) {
+		h1 {
+			font-size: 7.2em
+		}
+
+		button,
+		input {
+			font-family: inherit;
+			font-size: 2em
+		}
+	}
+	</style>
 </head>
+
 <body>
 	<main>
 		<h1>packd</h1>
@@ -120,20 +123,17 @@ a,footer {
 			<input value='left-pad' spellcheck='false' onfocus='this.setSelectionRange(0, 99999)'>
 			<button>Go</button>
 		</form>
-
-		<span class='loading'>
-			packd is bundling your package. this may take a while for uncached packages.
-		</span>
+		<span class='loading'> packd is bundling your package. this may take a while for uncached packages. </span>
 	</main>
-
 	<footer>
 		<p>Package authors: You should be using <a href='https://github.com/rollup/rollup/wiki/pkg.module'>pkg.module</a>!</p>
-
 		<p>Rollup/Browserify as a service.<br>Version __VERSION__. <a href='https://github.com/Rich-Harris/packd'>GitHub</a></p>
 	</footer>
-
 	<script>
-		document.querySelector("form").addEventListener("submit",e=>{e.preventDefault(),document.querySelector(".loading").classList.add("active");e=document.querySelector("input");window.history.pushState({},"","/"+e.value),window.location.href="/"+e.value});
+	document.querySelector("form").addEventListener("submit", e => { e.preventDefault(), document.querySelector(".loading").classList.add("active");
+		e = document.querySelector("input");
+		window.history.pushState({}, "", "/" + e.value), window.location.href = "/" + e.value });
 	</script>
 </body>
+
 </html>
