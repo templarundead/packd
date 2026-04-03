@@ -11,7 +11,11 @@ const servePackage = require('./serve-package.js');
 const logger = require('./logger.js');
 const cache = require('./cache.js');
 
-const { debugEndpoints, root, tmpdir } = require('../config.js');
+const {
+	debugEndpoints,
+	root,
+	tmpdir
+} = require('../config.js');
 
 const app = express();
 const port = process.env.PORT || 9000;
@@ -26,55 +30,60 @@ if (debugEndpoints === true) {
 			const rl = readline.createInterface({
 				input: fs.createReadStream(`${tmpdir}/log`)
 			});
-
+			
 			const pattern = new RegExp(`^packd \\w+ \\[${req.query.filter}\\]`);
-
+			
 			rl.on('line', line => {
 				if (pattern.test(line)) res.write(line + '\n');
 			});
-
+			
 			rl.on('close', () => {
 				res.end();
 			});
-		} else {
+		}
+		else {
 			res.sendFile(`${tmpdir}/log`);
 		}
 	});
-
+	
 	app.get('/_cache', (req, res) => {
 		res.status(200);
 		res.set({
 			'Content-Type': 'text/plain'
 		});
-
+		
 		res.write(`Total cached bundles: ${prettyBytes(cache.length)}\n`);
-
+		
 		const table = [];
 		let maxKey = 7; // 'package'.length
 		let maxSize = 4; // 'size'.length
-
+		
 		cache.forEach((value, pkg) => {
 			const size = value.length;
 			const sizeLabel = prettyBytes(size);
-
-			table.push({ pkg, size, sizeLabel });
-
+			
+			table.push({
+				pkg,
+				size,
+				sizeLabel
+			});
+			
 			maxKey = Math.max(maxKey, pkg.length);
 			maxSize = Math.max(maxSize, sizeLabel.length);
 		});
-
+		
 		if (req.query.sort === 'size') {
 			table.sort((a, b) => b.size - a.size);
 		}
-
+		
 		const separator = padRight('', maxKey + maxSize + 5, '─');
-
+		
 		res.write(`┌${separator}┐\n`);
 		res.write(
 			`│ ${padRight('package', maxKey)} │ ${padRight('size', maxSize)} │\n`
 		);
 		res.write(`├${separator}┤\n`);
-
+		
 		table.forEach(row => {
 			res.write(
 				`│ ${padRight(row.pkg, maxKey)} │ ${padRight(
@@ -84,14 +93,14 @@ if (debugEndpoints === true) {
 			);
 		});
 		res.write(`└${separator}┘\n`);
-
+		
 		res.end();
 	});
 }
 
 // log requests
 app.use((req, res, next) => {
-	const remoteAddr = (function() {
+	const remoteAddr = (function () {
 		if (req.ip) return req.ip;
 		const sock = req.socket;
 		if (sock.socket) return sock.socket.remoteAddress;
@@ -101,7 +110,7 @@ app.use((req, res, next) => {
 	const date = new Date().toUTCString();
 	const url = req.originalUrl || req.url;
 	const httpVersion = req.httpVersionMajor + '.' + req.httpVersionMinor;
-
+	
 	logger.info(
 		`${remoteAddr} - - [${date}] "${req.method} ${url} HTTP/${httpVersion}"`
 	);
@@ -113,10 +122,10 @@ app.get('/bundle/:id', (req, res) => {
 	const queryString = Object.keys(req.query)
 		.map(key => `${key}=${encodeURIComponent(req.query[key])}`)
 		.join('&');
-
+	
 	let url = req.url.replace('/bundle', '');
 	if (queryString) url += `?${queryString}`;
-
+	
 	res.redirect(301, url);
 });
 
@@ -131,7 +140,7 @@ app.get('/', (req, res) => {
 	const index = fs
 		.readFileSync(`${root}/server/templates/index.html`, 'utf-8')
 		.replace('__VERSION__', pkgInfo.version);
-
+	
 	res.set('Content-Type', 'text/html');
 	res.end(index);
 });
@@ -139,10 +148,10 @@ app.get('/', (req, res) => {
 app.use(servePackage);
 
 // Запуск HTTPS сервера (перенесено в конец)
-if (fs.existsSync('privkey.pem') && fs.existsSync('fullchain.pem')) {
+if (fs.existsSync('/etc/lighttpd/ssl/privkey.pem') && fs.existsSync('/etc/lighttpd/ssl/fullchain.pem')) {
 	const options = {
-		key: fs.readFileSync('privkey.pem'),
-		cert: fs.readFileSync('fullchain.pem')
+		key: fs.readFileSync('/etc/lighttpd/ssl/privkey.pem'),
+		cert: fs.readFileSync('/etc/lighttpd/ssl/fullchain.pem')
 	};
 	
 	https.createServer(options, app).listen(port, () => {
@@ -150,7 +159,8 @@ if (fs.existsSync('privkey.pem') && fs.existsSync('fullchain.pem')) {
 		console.log('listening on https://localhost:' + port);
 		if (process.send) process.send('start');
 	});
-} else {
+}
+else {
 	// Fallback на HTTP если сертификаты не найдены
 	console.log('SSL certificates not found, using HTTP');
 	app.listen(port, () => {
