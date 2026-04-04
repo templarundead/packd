@@ -26,8 +26,15 @@ function stringify(query) {
 }
 
 function escapeHtml(text) {
-	if (!text) return '';
-	return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    if (!text) return '';
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/`/g, '&#96;')
+        .replace(/\//g, '&#47;');
 }
 module.exports = function servePackage(req, res, next) {
 	if (req.method !== 'GET') return next();
@@ -82,22 +89,22 @@ module.exports = function servePackage(req, res, next) {
 			} else {
 				// Показываем HTML с кнопкой
 // Показываем HTML с кнопкой
+// Показываем HTML с кнопкой
 try {
     const bundleContent = zlib.gunzipSync(zipped).toString('utf-8');
     const gzippedSize = formatBytes(zipped.length);
     const originalSize = formatBytes(Buffer.byteLength(bundleContent, 'utf-8'));
+    const sizeLabel = `${originalSize} (${gzippedSize} gzipped)`;
     const packageDisplay = qualified + (tag !== 'latest' ? `@${tag}` : '');
     
     const templatePath = `${root}/server/templates/bundle.html`;
     let template = fs.readFileSync(templatePath, 'utf-8');
     
-    // Заменяем все переменные
-    const html = template
-        .replace(/__PACKAGE_NAME__/g, escapeHtml(packageDisplay))
-        .replace('__ORIGINAL_SIZE__', escapeHtml(originalSize))
-        .replace('__GZIPPED_SIZE__', escapeHtml(gzippedSize))
-        .replace('__BUNDLE_CONTENT__', escapeHtml(bundleContent));
-    
+// Вместо прямой вставки, используем JSON.stringify для экранирования
+const html = template
+    .replace(/__PACKAGE_NAME__/g, escapeHtml(packageDisplay))
+    .replace('__PACKAGE_SIZE__', escapeHtml(sizeLabel))
+    .replace('__BUNDLE_CONTENT_PLACEHOLDER__', JSON.stringify(bundleContent));
     res.status(200);
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.end(html);
