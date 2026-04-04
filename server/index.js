@@ -145,9 +145,22 @@ app.get('/', (req, res) => {
 	res.end(index);
 });
 
+// ===== ИГНОРИРУЕМ ИКОНКИ (без использования *) =====
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+app.get('/icon.png', (req, res) => res.status(204).end());
+app.get('/startup.png', (req, res) => res.status(204).end());
+
+// Используем регулярные выражения вместо * для любых apple-touch-icon
+app.get(/\/apple-touch-icon.*\.png$/, (req, res) => res.status(204).end());
+app.get(/\/apple-touch-icon.*\.ico$/, (req, res) => res.status(204).end());
+
+// Общий обработчик для всех изображений
+app.get(/\.(png|ico|jpg|jpeg|gif|svg|webp)$/i, (req, res) => res.status(204).end());
+// ===== КОНЕЦ =====
+
 app.use(servePackage);
 
-// Запуск HTTPS сервера (перенесено в конец)
+// Запуск HTTPS сервера
 if (fs.existsSync('/etc/lighttpd/ssl/privkey.pem') && fs.existsSync('/etc/lighttpd/ssl/fullchain.pem')) {
 	const options = {
 		key: fs.readFileSync('/etc/lighttpd/ssl/privkey.pem'),
@@ -161,7 +174,6 @@ if (fs.existsSync('/etc/lighttpd/ssl/privkey.pem') && fs.existsSync('/etc/lightt
 	});
 }
 else {
-	// Fallback на HTTP если сертификаты не найдены
 	console.log('SSL certificates not found, using HTTP');
 	app.listen(port, () => {
 		logger.log(`started at ${new Date().toUTCString()}`);
